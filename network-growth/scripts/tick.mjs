@@ -88,10 +88,14 @@ function processAccount(acc, now, nowHHMM, dayStartUtc) {
            WHERE account = ? AND action = 'invite' AND success = 1 AND started_at >= ?`,
         )
         .get(acc.name, dayStartUtc).c,
-      lastInviteAttempt: db
+      // Pace on the last SUCCESSFUL send, not on any attempt. A transient/failed attempt did
+      // not send a request, so it must not consume the interval — otherwise a cold first run
+      // stalls the account for a full interval. With this, transient failures retry next tick
+      // until one succeeds, then proper spacing kicks in.
+      lastSentAt: db
         .prepare(
           `SELECT MAX(started_at) AS t FROM runs
-           WHERE account = ? AND action = 'invite' AND started_at >= ?`,
+           WHERE account = ? AND action = 'invite' AND success = 1 AND started_at >= ?`,
         )
         .get(acc.name, dayStartUtc).t,
       notConnected: db
@@ -117,7 +121,7 @@ function processAccount(acc, now, nowHHMM, dayStartUtc) {
   } else if (stats.sentToday >= acc.daily_invite_limit) {
     skipped.invite = 'daily_quota_reached';
   } else {
-    const elapsed = minutesSince(parseDbUtc(stats.lastInviteAttempt), now);
+    const elapsed = minutesSince(parseDbUtc(stats.lastSentAt), now);
     if (elapsed >= acc.min_invite_interval_minutes) {
       runChild('network-invite.mjs', acc.name, ['--limit', '1']);
       did.push({

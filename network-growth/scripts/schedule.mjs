@@ -61,6 +61,21 @@ function tickCommand() {
   return { node, script };
 }
 
+// Background schedulers (launchd / systemd / cron) run with a minimal PATH that usually
+// excludes /usr/local/bin and node-manager bin dirs — so a bare `linkedin` spawn would fail
+// with ENOENT and every scheduled invite would silently fail. Bake the install-time PATH
+// (the user's shell PATH, which has `linkedin`) into the job, and make sure the directory of
+// the `linkedin` binary is included.
+function jobPath() {
+  const parts = (process.env.PATH || '').split(':').filter(Boolean);
+  const r = spawnSync('which', ['linkedin'], { stdio: 'pipe' });
+  if (r.status === 0) {
+    const dir = r.stdout.toString().trim().replace(/\/linkedin$/, '');
+    if (dir && !parts.includes(dir)) parts.unshift(dir);
+  }
+  return parts.join(':');
+}
+
 function install() {
   const intervalMinutes = intFlag(flags, 'interval-minutes', defaults().tick_interval_minutes);
   if (intervalMinutes < 1 || intervalMinutes > 60) {
@@ -157,6 +172,10 @@ function installLaunchd(intervalMinutes) {
     <string>${node}</string>
     <string>${script}</string>
   </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>${jobPath()}</string>
+  </dict>
   <key>StartInterval</key><integer>${intervalMinutes * 60}</integer>
   <key>RunAtLoad</key><false/>
   <key>StandardOutPath</key><string>${stdoutLog}</string>
@@ -200,6 +219,7 @@ Description=Linked API network-growth tick
 
 [Service]
 Type=oneshot
+Environment=PATH=${jobPath()}
 ExecStart=${node} ${script}
 StandardOutput=append:${join(logsDir(), 'tick.stdout.log')}
 StandardError=append:${join(logsDir(), 'tick.stderr.log')}
@@ -246,7 +266,8 @@ function installCron(intervalMinutes) {
     .filter((l) => !l.includes(SERVICE_ID))
     .filter((l) => l.length > 0);
   const minutes = intervalMinutes === 1 ? '*' : `*/${intervalMinutes}`;
-  const line = `${minutes} * * * * ${node} ${script} >> ${join(logsDir(), 'tick.cron.log')} 2>&1 # ${SERVICE_ID}`;
+  // PATH is set inline so the spawned `linkedin` binary is found (cron's default PATH is minimal).
+  const line = `${minutes} * * * * PATH="${jobPath()}" ${node} ${script} >> ${join(logsDir(), 'tick.cron.log')} 2>&1 # ${SERVICE_ID}`;
   const next = [...existing, line, ''].join('\n');
   const r = spawnSync('crontab', ['-'], { input: next, stdio: ['pipe', 'inherit', 'inherit'] });
   if (r.status !== 0) throw new Error('crontab update failed');

@@ -52,14 +52,19 @@ async function main() {
     return;
   }
 
+  // Prefer never-tried leads, then least-recently-attempted, so a lead that keeps failing
+  // transiently rotates to the back instead of blocking the whole queue. (NULL last_try
+  // sorts first in SQLite ASC.)
   const leads = withDb(
     (db) =>
       db
         .prepare(
-          `SELECT hashed_url, public_url, full_name
-           FROM leads
-           WHERE owner_account = ? AND status = 'not_connected'
-           ORDER BY created_at ASC
+          `SELECT l.hashed_url, l.public_url, l.full_name,
+                  (SELECT MAX(r.started_at) FROM runs r
+                   WHERE r.lead_hashed_url = l.hashed_url AND r.action = 'invite') AS last_try
+           FROM leads l
+           WHERE l.owner_account = ? AND l.status = 'not_connected'
+           ORDER BY last_try ASC, l.created_at ASC
            LIMIT ?`,
         )
         .all(account.name, budget),
@@ -71,7 +76,7 @@ async function main() {
     return;
   }
 
-  const summary = { processed: 0, pending: 0, connected: 0, errors: 0, aborted: false };
+  const summary = { processed: 0, pending: 0, connected: 0, transient: 0, errors: 0, aborted: false };
   for (const lead of leads) {
     const personUrl = lead.public_url || lead.hashed_url;
     const def = {
@@ -110,9 +115,10 @@ async function main() {
     }
 
     const outcome = classifyInviteResult(cli);
+    const sent = outcome.status === 'pending' || outcome.status === 'connected';
     withDb((db) => {
       recordRunFinish(db, runId, {
-        success: outcome.status !== 'error',
+        success: sent,
         rawResponse: cli.json,
         errorMessage: outcome.errorMessage ?? null,
       });
@@ -122,6 +128,7 @@ async function main() {
     summary.processed++;
     if (outcome.status === 'pending') summary.pending++;
     else if (outcome.status === 'connected') summary.connected++;
+    else if (outcome.status === 'transient') summary.transient++;
     else summary.errors++;
 
     if (summary.processed < leads.length) {
@@ -142,29 +149,50 @@ async function main() {
   });
 }
 
+// Three kinds of outcome:
+//   pending/connected — the request was sent (or they were already connected).
+//   transient         — an infra/session hiccup (no parseable response, CLI error, or the
+//                       profile page never opened). NOT a verdict on the lead → keep it
+//                       not_connected and retry later. Common on a cold first run.
+//   error             — a real per-person failure: the profile opened but
+//                       sendConnectionRequest returned a definite failure. Terminal.
 function classifyInviteResult(cli) {
-  const body = cli.json ?? {};
-  if (body.success === false) {
+  // No parseable JSON, or the CLI itself failed (non-fatal exit) → transient.
+  if (!cli.json || cli.exitCode !== 0) {
     return {
-      status: 'error',
-      errorType: body.error?.type ?? 'cliError',
-      errorMessage: body.error?.message ?? `exit ${cli.exitCode}`,
+      status: 'transient',
+      errorType: 'transient',
+      errorMessage: (cli.stderr || cli.error || `no response (exit ${cli.exitCode})`)
+        .toString()
+        .trim()
+        .slice(0, 200),
     };
   }
-  // completion = the st.openPersonPage result. The docs place the chained action
-  // result at completion.then (sibling of data); the production n8n webhook places
-  // it at completion.data.then (nested). Accept either so we don't depend on which
-  // transport shape the API returns.
+  const body = cli.json;
+  if (body.success === false) {
+    return { status: 'transient', errorType: body.error?.type ?? 'requestError', errorMessage: body.error?.message ?? 'request error' };
+  }
+  // completion = the st.openPersonPage result. The chained sendConnectionRequest result is
+  // at completion.then (docs/sibling) or completion.data.then (n8n/nested). Accept either.
   const completion = body.data ?? {};
-  const then = completion.then ?? completion.data?.then ?? {};
-  if (then.success === true) return { status: 'pending' };
-  const thenErrType = then.error?.type ?? '';
-  if (thenErrType.toLowerCase().includes('alreadypending')) return { status: 'pending' };
-  if (thenErrType.toLowerCase().includes('alreadyconnected')) return { status: 'connected' };
+  const then = completion.then ?? completion.data?.then;
+  if (then && then.success === true) return { status: 'pending' };
+  const thenErrType = (then?.error?.type ?? '').toLowerCase();
+  if (thenErrType.includes('alreadypending')) return { status: 'pending' };
+  if (thenErrType.includes('alreadyconnected')) return { status: 'connected' };
+  if (then && then.success === false) {
+    // The profile opened but the request was genuinely refused for this person → terminal.
+    return {
+      status: 'error',
+      errorType: then.error?.type || 'unknown',
+      errorMessage: then.error?.message ?? 'connection request failed',
+    };
+  }
+  // No `then` result at all → the profile page never opened (session/page issue) → transient.
   return {
-    status: 'error',
-    errorType: thenErrType || 'unknown',
-    errorMessage: then.error?.message ?? 'connection request failed',
+    status: 'transient',
+    errorType: completion.error?.type ?? 'openFailed',
+    errorMessage: completion.error?.message ?? 'profile did not open',
   };
 }
 
@@ -190,6 +218,10 @@ function applyInviteOutcome(db, lead, outcome, payload) {
          basic_info_json = ?, error_type = NULL, error_message = NULL
        WHERE hashed_url = ?`,
     ).run(publicUrl, basicInfo, lead.hashed_url);
+  } else if (outcome.status === 'transient') {
+    // Infra/session hiccup — leave the lead not_connected so it retries. The failed attempt
+    // is captured in the runs table for audit; we don't touch the lead's status.
+    return;
   } else {
     db.prepare(
       `UPDATE leads SET status='error', status_updated_at = datetime('now'),
