@@ -76,7 +76,7 @@ async function main() {
     return;
   }
 
-  const summary = { processed: 0, pending: 0, connected: 0, transient: 0, errors: 0, aborted: false };
+  const summary = { processed: 0, pending: 0, connected: 0, transient: 0, limited: 0, errors: 0, aborted: false };
   for (const lead of leads) {
     const personUrl = lead.public_url || lead.hashed_url;
     const def = {
@@ -115,6 +115,25 @@ async function main() {
     }
 
     const outcome = classifyInviteResult(cli);
+
+    if (outcome.status === 'limited') {
+      // The account hit its connection-request limit (platform-side, action category).
+      // This is NOT a verdict on the lead — leave it not_connected and back off so we
+      // don't burn the rest of the queue against the same wall. The lead is retried on a
+      // later wake-up, once the account's limit recovers (or is raised).
+      withDb((db) =>
+        recordRunFinish(db, runId, {
+          success: false,
+          rawResponse: cli.json,
+          errorMessage: outcome.errorMessage ?? 'account action limit reached',
+        }),
+      );
+      summary.limited++;
+      summary.aborted = true;
+      summary.abort_reason = 'account invite limit reached';
+      break;
+    }
+
     const sent = outcome.status === 'pending' || outcome.status === 'connected';
     withDb((db) => {
       recordRunFinish(db, runId, {
@@ -149,8 +168,12 @@ async function main() {
   });
 }
 
-// Three kinds of outcome:
+// Four kinds of outcome:
 //   pending/connected — the request was sent (or they were already connected).
+//   limited           — the account hit its platform-side limit for the connection-request
+//                       action category. NOT a verdict on the lead → keep it not_connected
+//                       and back off (the caller aborts the rest of this account's cycle).
+//                       The lead is retried on a later wake-up.
 //   transient         — an infra/session hiccup (no parseable response, CLI error, or the
 //                       profile page never opened). NOT a verdict on the lead → keep it
 //                       not_connected and retry later. Common on a cold first run.
@@ -170,6 +193,14 @@ function classifyInviteResult(cli) {
   }
   const body = cli.json;
   if (body.success === false) {
+    const topErrType = (body.error?.type ?? '').toLowerCase();
+    if (isLimitError(topErrType)) {
+      return {
+        status: 'limited',
+        errorType: body.error?.type || 'limitExceeded',
+        errorMessage: body.error?.message ?? 'account action limit reached',
+      };
+    }
     return { status: 'transient', errorType: body.error?.type ?? 'requestError', errorMessage: body.error?.message ?? 'request error' };
   }
   // completion = the st.openPersonPage result. The chained sendConnectionRequest result is
@@ -181,6 +212,15 @@ function classifyInviteResult(cli) {
   if (thenErrType.includes('alreadypending')) return { status: 'pending' };
   if (thenErrType.includes('alreadyconnected')) return { status: 'connected' };
   if (then && then.success === false) {
+    // Account-level rate / action-category limit (platform-side) → back off, don't burn
+    // the lead. It stays not_connected and is retried on a later wake-up.
+    if (isLimitError(thenErrType)) {
+      return {
+        status: 'limited',
+        errorType: then.error?.type || 'limitExceeded',
+        errorMessage: then.error?.message ?? 'account action limit reached',
+      };
+    }
     // The profile opened but the request was genuinely refused for this person → terminal.
     return {
       status: 'error',
@@ -194,6 +234,13 @@ function classifyInviteResult(cli) {
     errorType: completion.error?.type ?? 'openFailed',
     errorMessage: completion.error?.message ?? 'profile did not open',
   };
+}
+
+// An account-level limit on an action category (e.g. "configured limit for this action
+// category has been exceeded", a rate limit, or too-many-requests). Signals back-off, not
+// a per-lead failure. `type` is already lower-cased by the caller.
+function isLimitError(type) {
+  return type.includes('limit') || type.includes('toomany');
 }
 
 function applyInviteOutcome(db, lead, outcome, payload) {
@@ -218,9 +265,10 @@ function applyInviteOutcome(db, lead, outcome, payload) {
          basic_info_json = ?, error_type = NULL, error_message = NULL
        WHERE hashed_url = ?`,
     ).run(publicUrl, basicInfo, lead.hashed_url);
-  } else if (outcome.status === 'transient') {
-    // Infra/session hiccup — leave the lead not_connected so it retries. The failed attempt
-    // is captured in the runs table for audit; we don't touch the lead's status.
+  } else if (outcome.status === 'transient' || outcome.status === 'limited') {
+    // Infra/session hiccup or an account-level limit — leave the lead not_connected so it
+    // retries. The failed attempt is captured in the runs table for audit; we don't touch
+    // the lead's status. (The main loop also handles `limited` by aborting the cycle.)
     return;
   } else {
     db.prepare(

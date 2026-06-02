@@ -269,6 +269,9 @@ Result classification:
 - `data.then.success === true` → `status='pending'`, `sent_at=now`, `basic_info_json` stored
 - `data.then.error.type` includes `alreadyPending` → `status='pending'`
 - `data.then.error.type` includes `alreadyConnected` → `status='connected'`
+- `data.then.error.type` signals an account-level limit on the action category (e.g.
+  `limitExceeded`, a rate limit) → the lead stays `not_connected` (NOT a per-lead error) and
+  this account's run backs off (stops for the cycle); the lead is retried on a later wake-up.
 - anything else → `status='error'`, `error_type`/`error_message` stored
 
 `linkedin-cli` exit code 4 (account issue) or 6 (rate limit) aborts the whole

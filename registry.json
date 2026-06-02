@@ -1,0 +1,29 @@
+{
+  "$schema": "./registry.schema.json",
+  "skills": {
+    "linkedin": {
+      "source": "linkedin",
+      "label": "General LinkedIn automation",
+      "description": "Fetch profiles, search people and companies, send messages, manage connections, create posts, and more.",
+      "agents": ["claude-code", "codex", "cursor", "windsurf"],
+      "prereqs": ["linkedin-cli", "tokens"],
+      "postInstall": [],
+      "slashCommands": null
+    },
+    "network-growth": {
+      "source": "network-growth",
+      "label": "Lead pipeline (import → qualify → invites)",
+      "description": "Two-phase LinkedIn lead pipeline: import + qualify leads against an ICP, then send connection invites on a schedule across one or more accounts.",
+      "agents": ["claude-code", "codex", "cursor", "windsurf"],
+      "prereqs": ["node>=20", "linkedin-cli", "tokens"],
+      "postInstall": [
+        { "run": ["npm", "install", "--omit=dev"], "cwd": "<skillDir>", "label": "Installing skill dependencies" },
+        { "run": ["node", "scripts/doctor.mjs", "--json"], "cwd": "<skillDir>", "expect": "ok", "label": "Verifying skill health" }
+      ],
+      "optional": [
+        { "prompt": "Enable the background scheduler now (sends invites on a schedule)?", "run": ["node", "scripts/schedule.mjs", "install"], "cwd": "<skillDir>", "label": "Installing background scheduler" }
+      ],
+      "slashCommands": "commands"
+    }
+  }
+}

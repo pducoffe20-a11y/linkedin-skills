@@ -1,0 +1,45 @@
+{
+  "name": "@linkedapi/skills",
+  "version": "1.0.0",
+  "description": "One-command installer for Linked API agent skills across Claude Code, Codex, Cursor, and Windsurf.",
+  "type": "module",
+  "bin": {
+    "linkedapi-skills": "src/cli.mjs"
+  },
+  "files": [
+    "src",
+    "linkedin",
+    "network-growth",
+    "registry.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/cli.mjs"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.5.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "linkedin",
+    "linkedapi",
+    "agent-skills",
+    "skill",
+    "claude-code",
+    "codex",
+    "cursor",
+    "windsurf"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Linked-API/linkedin-skills.git"
+  },
+  "homepage": "https://linkedapi.io/skills"
+}
