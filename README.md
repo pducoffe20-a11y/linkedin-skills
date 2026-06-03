@@ -19,11 +19,18 @@ Or just hand this to your AI agent:
 Read https://linkedapi.io/skills/install.md and follow it.
 ```
 
+For a single skill, hand over its own runbook instead — e.g.
+`https://linkedapi.io/skills/linkedin/install.md` or
+`https://linkedapi.io/skills/network-growth/install.md`.
+
 ### Non-interactive (agents / CI)
 
 ```bash
 # Inspect the environment first (machine-readable)
 npx @linkedapi/skills detect --json
+
+# Install one skill in one command
+npx @linkedapi/skills add linkedin --yes
 
 # Install specific skills into specific agents
 npx @linkedapi/skills add linkedin network-growth \

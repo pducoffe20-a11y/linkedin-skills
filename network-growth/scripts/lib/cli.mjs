@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 
-export function runLinkedin(args, { cliAccount, input, timeoutMs = 600000 } = {}) {
+export function runLinkedin(args, { cliAccount, input, timeoutMs } = {}) {
   // oclif requires the command/topic tokens first, then flags:
   // `linkedin <command> --json -q --account "<name>"`. Flags before the command
   // make oclif treat the first flag as the command name (exit 2).
@@ -9,25 +9,31 @@ export function runLinkedin(args, { cliAccount, input, timeoutMs = 600000 } = {}
   return runCommand('linkedin', finalArgs, { input, timeoutMs });
 }
 
-export function runCommand(command, args, { input, timeoutMs = 600000 } = {}) {
+export function runCommand(command, args, { input, timeoutMs } = {}) {
   return new Promise((resolve) => {
     const child = spawn(command, args, { stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
     let killed = false;
-    const timer = setTimeout(() => {
-      killed = true;
-      child.kill('SIGKILL');
-    }, timeoutMs);
+    // No timeout by default: long-running LinkedIn scrapes (e.g. a max Sales
+    // Navigator search) must run to completion. Callers that need a fast-fail
+    // probe (such as the doctor health checks) opt in by passing timeoutMs.
+    const timer =
+      timeoutMs === undefined
+        ? undefined
+        : setTimeout(() => {
+            killed = true;
+            child.kill('SIGKILL');
+          }, timeoutMs);
 
     child.stdout.on('data', (b) => (stdout += b.toString()));
     child.stderr.on('data', (b) => (stderr += b.toString()));
     child.on('error', (err) => {
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
       resolve({ ok: false, exitCode: -1, stdout, stderr, error: err.message });
     });
     child.on('close', (code) => {
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
       resolve({
         ok: code === 0 && !killed,
         exitCode: code ?? -1,
