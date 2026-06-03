@@ -255,20 +255,39 @@ function commit() {
     }
 
     const activeAccounts = db
-      .prepare('SELECT name FROM accounts WHERE paused = 0 ORDER BY name')
-      .all()
-      .map((r) => r.name);
+      .prepare('SELECT name, daily_invite_limit FROM accounts WHERE paused = 0 ORDER BY name')
+      .all();
     if (activeAccounts.length === 0) {
-      throw new Error('No active (non-paused) accounts available for round-robin assignment');
+      throw new Error('No active (non-paused) accounts available for lead assignment');
     }
 
-    const cursor =
-      db.prepare('SELECT last_assigned_account FROM import_state WHERE id = 1').get()
-        ?.last_assigned_account ?? null;
-    let nextIdx =
-      cursor && activeAccounts.includes(cursor)
-        ? (activeAccounts.indexOf(cursor) + 1) % activeAccounts.length
-        : 0;
+    // Assign each lead to the active account with the lowest projected runway
+    // (not_connected ÷ daily_invite_limit). Seeding each account's load from its
+    // current not_connected count means that, regardless of differing daily limits
+    // or pre-existing backlogs, every account's queue drains at roughly the same
+    // time instead of the lowest-limit account lagging far behind.
+    const loadByName = new Map(activeAccounts.map((a) => [a.name, 0]));
+    const limitByName = new Map(activeAccounts.map((a) => [a.name, a.daily_invite_limit]));
+    for (const row of db
+      .prepare(
+        "SELECT owner_account, COUNT(*) AS c FROM leads WHERE status = 'not_connected' GROUP BY owner_account",
+      )
+      .all()) {
+      if (loadByName.has(row.owner_account)) loadByName.set(row.owner_account, row.c);
+    }
+
+    function pickOwner() {
+      let best = activeAccounts[0].name;
+      let bestRunway = loadByName.get(best) / limitByName.get(best);
+      for (const a of activeAccounts) {
+        const runway = loadByName.get(a.name) / limitByName.get(a.name);
+        if (runway < bestRunway) {
+          best = a.name;
+          bestRunway = runway;
+        }
+      }
+      return best;
+    }
 
     // Re-load candidates from candidate file path stored in the batch dir
     const candidateFile = join(tmpDir(), `qualify-${batchId}.candidates.json`);
@@ -291,7 +310,7 @@ function commit() {
       let skippedExisting = 0;
       let skippedMissing = 0;
       let assigned = 0;
-      let lastAssigned = cursor;
+      let lastAssigned = null;
 
       for (const r of results) {
         if (!r || !r.hashed_url) {
@@ -308,8 +327,7 @@ function commit() {
           continue;
         }
         suitable++;
-        const owner = activeAccounts[nextIdx];
-        nextIdx = (nextIdx + 1) % activeAccounts.length;
+        const owner = pickOwner();
         const result = insert.run(
           cand.hashed_url,
           cand.public_url,
@@ -322,6 +340,7 @@ function commit() {
         );
         if (result.changes === 1) {
           assigned++;
+          loadByName.set(owner, loadByName.get(owner) + 1);
           lastAssigned = owner;
         } else {
           skippedExisting++;
