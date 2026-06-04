@@ -3,6 +3,8 @@
   "min_invite_interval_minutes": 15,
   "max_pending_days": 10,
   "pending_batch_size": 5,
+  "pending_drain_batch": 2,
+  "pending_tick_budget_seconds": 180,
   "active_start": "09:00",
   "active_end": "18:00",
   "invite_delay_seconds": 60,

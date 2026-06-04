@@ -26,7 +26,13 @@ export async function installSkill(skill, targets, options) {
     postInstall: [],
     optional: [],
     slashCommands: null,
+    // `ok` = the install itself succeeded (files placed + required steps passed).
+    // `ready` = the skill is fully configured and usable right now (null = not probed).
+    // `pending` = what the user still needs to do before it works (e.g. connect tokens).
+    // These are separate axes: a skill can install fine (ok) yet not be ready until setup.
     ok: true,
+    ready: null,
+    pending: [],
   };
 
   if (dryRun) {
@@ -60,7 +66,12 @@ export async function installSkill(skill, targets, options) {
     for (const step of skill.postInstall ?? []) {
       const stepResult = await runStep(step, dir);
       result.postInstall.push({ dir, ...stepResult });
-      if (!stepResult.ok) result.ok = false;
+      // Advisory steps (readiness probes) report status but never fail the install.
+      if (!stepResult.ok && !stepResult.advisory) result.ok = false;
+      if (stepResult.health) {
+        result.ready = stepResult.health.ok;
+        result.pending = stepResult.health.pending;
+      }
     }
     if (enableOptional) {
       for (const step of skill.optional ?? []) {
@@ -134,11 +145,29 @@ async function runStep(step, dir) {
   const [command, ...rest] = args;
   const res = await runCommand(command, rest, { cwd, timeoutMs: STEP_TIMEOUT_MS });
   let ok = res.ok;
+  let health;
   if (step.expect === 'ok') {
     const parsed = tryParseJson(res.stdout);
     ok = res.exitCode === 0 && parsed?.data?.ok === true;
+    if (parsed?.data) {
+      // Summarize a doctor-style payload so callers can show what's still pending.
+      const checks = Array.isArray(parsed.data.checks) ? parsed.data.checks : [];
+      health = {
+        ok: parsed.data.ok === true,
+        pending: checks
+          .filter((c) => c && c.ok === false)
+          .map((c) => ({ name: c.name, message: c.message ?? null })),
+      };
+    }
   }
-  return { step: stepLabel(step), ok, exitCode: res.exitCode, stderr: trimTail(res.stderr) };
+  return {
+    step: stepLabel(step),
+    ok,
+    advisory: step.advisory === true,
+    exitCode: res.exitCode,
+    stderr: trimTail(res.stderr),
+    ...(health ? { health } : {}),
+  };
 }
 
 function copyDir(src, dest) {

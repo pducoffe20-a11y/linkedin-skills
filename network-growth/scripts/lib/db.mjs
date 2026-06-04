@@ -138,12 +138,16 @@ export function openDb({ readonly = false } = {}) {
   if (readonly) {
     const w = new Database(path);
     w.pragma('journal_mode = WAL');
+    w.pragma('busy_timeout = 5000');
     migrate(w);
     w.close();
   }
   const db = new Database(path, { readonly, fileMustExist: readonly });
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
+  // Per-account workers run concurrently now, so several short writes can land at once.
+  // Wait (don't fail) up to 5s for the write lock instead of throwing SQLITE_BUSY.
+  db.pragma('busy_timeout = 5000');
   if (!readonly) migrate(db);
   return db;
 }

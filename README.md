@@ -40,6 +40,28 @@ npx @linkedapi/skills add linkedin network-growth \
 Other commands: `list`, `update`, `remove`, `doctor` (all support `--json`). See
 `npx @linkedapi/skills --help`.
 
+#### Exit codes & readiness
+
+`add` separates two things so a caller never mistakes "needs setup" for "install failed"
+(the agent-facing install runbook at `linkedapi.io/skills/install.md` spells this out for AI agents):
+
+- **Exit code** reflects only whether the install itself succeeded (files placed +
+  dependencies installed). `0` = installed. `1` = a real install failure. `2` = bad arguments.
+- **Readiness** is reported in the JSON, not the exit code. Each skill carries `ok` (installed)
+  and `ready` (fully configured and usable now). When a skill installed fine but still needs
+  setup — e.g. LinkedIn tokens not connected yet — you get **exit 0** with `ready: false` and a
+  `pending` list describing what's left. Always parse the JSON; do not treat a readiness gap as
+  a failure.
+
+```jsonc
+{ "success": true,
+  "data": {
+    "ready": false,
+    "pending": [{ "skill": "network-growth", "pending": [{ "name": "db-accounts", "message": "0 accounts in DB — register each linkedin-cli account…" }] }],
+    "installed": [{ "skill": "network-growth", "ok": true, "ready": false }]
+  } }
+```
+
 ## Available skills
 
 | Skill | Description |

@@ -113,8 +113,16 @@ async function commandAdd(skillNames, flags, ctx) {
     );
   }
 
+  // Exit code reflects whether the INSTALL succeeded (files + required steps) — NOT whether
+  // every skill is fully configured. A skill can install fine yet still need setup (e.g.
+  // LinkedIn tokens); that shows up as `ready: false` + `pending`, not a non-zero exit, so a
+  // JSON-parsing agent isn't tricked into treating "needs setup" as "install failed".
   const ok = installed.every((r) => r.ok);
-  writeResult(success({ dryRun, scope, mode, agents, prereqs, installed }));
+  const ready = installed.every((r) => r.ready !== false);
+  const pending = installed
+    .filter((r) => r.ready === false)
+    .map((r) => ({ skill: r.skill, pending: r.pending ?? [] }));
+  writeResult(success({ dryRun, scope, mode, agents, prereqs, installed, ready, pending }));
   process.exit(ok ? 0 : 1);
 }
 

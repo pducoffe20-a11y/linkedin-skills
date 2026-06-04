@@ -18,7 +18,7 @@
       "prereqs": ["node>=20", "linkedin-cli", "tokens"],
       "postInstall": [
         { "run": ["npm", "install", "--omit=dev"], "cwd": "<skillDir>", "label": "Installing skill dependencies" },
-        { "run": ["node", "scripts/doctor.mjs", "--json"], "cwd": "<skillDir>", "expect": "ok", "label": "Verifying skill health" }
+        { "run": ["node", "scripts/doctor.mjs", "--json"], "cwd": "<skillDir>", "expect": "ok", "advisory": true, "label": "Checking readiness" }
       ],
       "optional": [
         { "prompt": "Enable the background scheduler now (sends invites on a schedule)?", "run": ["node", "scripts/schedule.mjs", "install"], "cwd": "<skillDir>", "label": "Installing background scheduler" }
