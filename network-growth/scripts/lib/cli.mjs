@@ -1,17 +1,26 @@
 import { spawn } from 'node:child_process';
 
+const LINKEDAPI_CLIENT = 'skill:network-growth';
+
 export function runLinkedin(args, { cliAccount, input, timeoutMs } = {}) {
   // oclif requires the command/topic tokens first, then flags:
   // `linkedin <command> --json -q --account "<name>"`. Flags before the command
   // make oclif treat the first flag as the command name (exit 2).
   const finalArgs = [...args, '--json', '-q'];
   if (cliAccount) finalArgs.push('--account', cliAccount);
-  return runCommand('linkedin', finalArgs, { input, timeoutMs });
+  return runCommand('linkedin', finalArgs, {
+    input,
+    timeoutMs,
+    env: { ...process.env, LINKEDAPI_CLIENT },
+  });
 }
 
-export function runCommand(command, args, { input, timeoutMs } = {}) {
+export function runCommand(command, args, { input, timeoutMs, env } = {}) {
   return new Promise((resolve) => {
-    const child = spawn(command, args, { stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(command, args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: env ?? process.env,
+    });
     let stdout = '';
     let stderr = '';
     let killed = false;

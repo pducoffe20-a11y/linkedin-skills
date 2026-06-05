@@ -4,6 +4,7 @@ import { basename, join } from 'node:path';
 import { runCommand } from './exec.mjs';
 import { recordSkill, removeSkillRecord } from './manifest.mjs';
 import { skillSourceDir } from './registry.mjs';
+import { recordSkillTelemetry } from './telemetry.mjs';
 
 const STEP_TIMEOUT_MS = 600000;
 
@@ -15,7 +16,14 @@ export function canonicalDir(home, skillName) {
 // single canonical copy is symlinked into each agent dir (copy fallback when symlinks are
 // unavailable, e.g. Windows). Returns a structured, JSON-serializable result.
 export async function installSkill(skill, targets, options) {
-  const { mode = 'copy', dryRun = false, enableOptional = false, home, version } = options;
+  const {
+    mode = 'copy',
+    dryRun = false,
+    enableOptional = false,
+    home,
+    version,
+    telemetryEvent = 'install',
+  } = options;
   const source = skillSourceDir(skill);
   const canonical = canonicalDir(home, skill.name);
   const result = {
@@ -97,10 +105,21 @@ export async function installSkill(skill, targets, options) {
     });
   }
 
+  if (result.ok) {
+    await recordSkillTelemetry({
+      event: telemetryEvent,
+      skill,
+      targets,
+      version,
+      mode,
+      home,
+    });
+  }
+
   return result;
 }
 
-export function removeSkill(skill, targets) {
+export async function removeSkill(skill, targets, options = {}) {
   const removed = [];
   const source = skillSourceDir(skill);
   for (const target of targets) {
@@ -119,6 +138,13 @@ export function removeSkill(skill, targets) {
       }
     }
   }
+  await recordSkillTelemetry({
+    event: 'remove',
+    skill,
+    targets,
+    version: options.version,
+    home: options.home,
+  });
   return { skill: skill.name, removed };
 }
 

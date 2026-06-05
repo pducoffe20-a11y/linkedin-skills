@@ -14,8 +14,8 @@ export function isFatalExitCode(code) {
 }
 
 // Stores the openPersonPage completion (the action object: { actionType, success,
-// data: { ...personInfo }, then }) minus the long free-text `about` field, matching
-// the n8n pipeline which stored body.data with body.data.data.about removed.
+// data: { ...personInfo }, then }) minus the long free-text `about` field, which is
+// dropped to keep the stored payload compact.
 export function trimBasicInfoForStorage(completion) {
   try {
     const clone = JSON.parse(JSON.stringify(completion));

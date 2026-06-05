@@ -117,7 +117,7 @@ function reconcileAccountsTable(db) {
   addColumn('pending_batch_size', 'pending_batch_size INTEGER NOT NULL DEFAULT 5');
   addColumn('last_action_at', 'last_action_at TEXT');
 
-  // Fold legacy columns forward (kept in place — old SQLite can't easily DROP COLUMN, and
+  // Fold older columns forward (kept in place — old SQLite can't easily DROP COLUMN, and
   // no code reads them anymore, so they are harmless).
   if (cols.has('cron_time')) {
     db.exec('UPDATE accounts SET active_start = cron_time');

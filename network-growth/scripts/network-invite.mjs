@@ -76,7 +76,11 @@ async function main() {
     return;
   }
 
-  const summary = { processed: 0, pending: 0, connected: 0, transient: 0, limited: 0, errors: 0, aborted: false };
+  const summary = {
+    processed: 0, pending: 0, connected: 0, transient: 0, limited: 0,
+    restricted_backoff: 0, restricted_closed: 0, restricted_deferred: 0,
+    errors: 0, aborted: false,
+  };
   for (const lead of leads) {
     const personUrl = lead.public_url || lead.hashed_url;
     const def = {
@@ -134,6 +138,46 @@ async function main() {
       break;
     }
 
+    if (outcome.status === 'restricted') {
+      // LinkedIn returned "restricted sending a connection request". Two distinct causes,
+      // same message — disambiguate by pattern (see classifyRestricted):
+      //   - streak (back-to-back, no successes between) => the account's weekly invite
+      //     limit. NOT the lead's fault: leave it not_connected, back off, do not count it.
+      //   - isolated (account otherwise sending fine) => this person restricts invites.
+      //     Count it against the lead; after RESTRICTED_LEAD_ATTEMPTS isolated hits, close
+      //     the lead (terminal 'exhausted') so it never hangs forever.
+      withDb((db) =>
+        recordRunFinish(db, runId, {
+          success: false,
+          rawResponse: cli.json,
+          errorMessage: outcome.errorMessage ?? 'connection request not allowed',
+        }),
+      );
+      const decision = withDb((db) => classifyRestricted(db, account.name, lead.hashed_url));
+      if (decision === 'streak') {
+        summary.restricted_backoff++;
+        summary.aborted = true;
+        summary.abort_reason = 'account restricted (likely weekly invite limit)';
+        break;
+      }
+      if (decision === 'terminate') {
+        withDb((db) =>
+          db
+            .prepare(
+              `UPDATE leads SET status='exhausted', status_updated_at=datetime('now'),
+                 error_type='requestNotAllowed', error_message=? WHERE hashed_url=?`,
+            )
+            .run(outcome.errorMessage ?? null, lead.hashed_url),
+        );
+        summary.restricted_closed++;
+      } else {
+        summary.restricted_deferred++; // left not_connected, retried much later
+      }
+      summary.processed++;
+      if (summary.processed < leads.length) await sleep(delay * 1000);
+      continue;
+    }
+
     const sent = outcome.status === 'pending' || outcome.status === 'connected';
     withDb((db) => {
       recordRunFinish(db, runId, {
@@ -168,12 +212,15 @@ async function main() {
   });
 }
 
-// Four kinds of outcome:
+// Five kinds of outcome:
 //   pending/connected — the request was sent (or they were already connected).
 //   limited           — the account hit its platform-side limit for the connection-request
 //                       action category. NOT a verdict on the lead → keep it not_connected
 //                       and back off (the caller aborts the rest of this account's cycle).
 //                       The lead is retried on a later wake-up.
+//   restricted        — LinkedIn "restricted sending a connection request". Ambiguous between
+//                       the account's weekly invite limit (streak) and a person who restricts
+//                       invites (isolated). The caller disambiguates via classifyRestricted.
 //   transient         — an infra/session hiccup (no parseable response, CLI error, or the
 //                       profile page never opened). NOT a verdict on the lead → keep it
 //                       not_connected and retry later. Common on a cold first run.
@@ -204,7 +251,7 @@ function classifyInviteResult(cli) {
     return { status: 'transient', errorType: body.error?.type ?? 'requestError', errorMessage: body.error?.message ?? 'request error' };
   }
   // completion = the st.openPersonPage result. The chained sendConnectionRequest result is
-  // at completion.then (docs/sibling) or completion.data.then (n8n/nested). Accept either.
+  // at completion.then (sibling) or completion.data.then (nested). Accept either.
   const completion = body.data ?? {};
   const then = completion.then ?? completion.data?.then;
   if (then && then.success === true) return { status: 'pending' };
@@ -219,6 +266,16 @@ function classifyInviteResult(cli) {
         status: 'limited',
         errorType: then.error?.type || 'limitExceeded',
         errorMessage: then.error?.message ?? 'account action limit reached',
+      };
+    }
+    // "LinkedIn has restricted sending a connection request" — ambiguous: either the account's
+    // weekly invite limit (comes in a streak) or this person restricting invites (isolated).
+    // The caller (classifyRestricted) disambiguates by pattern; never burn it blindly here.
+    if (thenErrType.includes('requestnotallowed')) {
+      return {
+        status: 'restricted',
+        errorType: then.error?.type || 'requestNotAllowed',
+        errorMessage: then.error?.message ?? 'LinkedIn restricted sending a connection request',
       };
     }
     // The profile opened but the request was genuinely refused for this person → terminal.
@@ -241,6 +298,36 @@ function classifyInviteResult(cli) {
 // a per-lead failure. `type` is already lower-cased by the caller.
 function isLimitError(type) {
   return type.includes('limit') || type.includes('toomany');
+}
+
+// How many ISOLATED requestNotAllowed hits a single lead may take before we close it.
+const RESTRICTED_LEAD_ATTEMPTS = 2;
+
+// Disambiguate a fresh requestNotAllowed (already recorded as a failed run) for this account:
+//   'streak'    — 2+ requestNotAllowed in a row with no successful invite since → the
+//                 account's weekly invite limit. Back off; do NOT blame the lead.
+//   'terminate' — isolated, and this lead has now hit the cap → close it (terminal).
+//   'defer'     — isolated, lead under the cap → leave not_connected, retry much later.
+function classifyRestricted(db, account, hashedUrl) {
+  const RNA = '%restricted sending a connection request%';
+  const lastOk = db
+    .prepare(`SELECT MAX(started_at) AS t FROM runs WHERE account = ? AND action = 'invite' AND success = 1`)
+    .get(account).t;
+  const streak = db
+    .prepare(
+      `SELECT COUNT(*) AS c FROM runs
+       WHERE account = ? AND action = 'invite' AND success = 0
+         AND error_message LIKE ? AND started_at > COALESCE(?, '0')`,
+    )
+    .get(account, RNA, lastOk).c;
+  if (streak >= 2) return 'streak';
+  const leadHits = db
+    .prepare(
+      `SELECT COUNT(*) AS c FROM runs
+       WHERE lead_hashed_url = ? AND action = 'invite' AND error_message LIKE ?`,
+    )
+    .get(hashedUrl, RNA).c;
+  return leadHits >= RESTRICTED_LEAD_ATTEMPTS ? 'terminate' : 'defer';
 }
 
 function applyInviteOutcome(db, lead, outcome, payload) {

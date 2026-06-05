@@ -1,6 +1,6 @@
 ---
 name: network-growth
-description: Two-phase LinkedIn lead pipeline driven by linkedin-cli. Phase A imports leads from a search URL or filters, qualifies them against a configurable ICP via sub-agent, and stores them in a local SQLite database with round-robin assignment across one or more LinkedIn accounts. Phase B runs on a schedule per account — sends connection invites up to a daily limit and withdraws stale pending requests. Use when the user wants to grow their network from LinkedIn searches, manage outgoing invites at scale, ask status questions (counts, conversion, pending older than N days, last imports), pause/resume an account, change ICP, or install the recurring scheduler. Replaces the n8n "Adding leads from search to our database" + "leads network management" workflows with a local skill.
+description: Two-phase LinkedIn lead pipeline driven by linkedin-cli. Phase A imports leads from a search URL or filters, qualifies them against a configurable ICP via sub-agent, and stores them in a local SQLite database with round-robin assignment across one or more LinkedIn accounts. Phase B runs on a schedule per account — sends connection invites up to a daily limit and withdraws stale pending requests. Use when the user wants to grow their network from LinkedIn searches, manage outgoing invites at scale, ask status questions (counts, conversion, pending older than N days, last imports), pause/resume an account, change ICP, or install the recurring scheduler.
 ---
 
 # Network Growth Skill
@@ -252,7 +252,7 @@ node scripts/network-pending.mjs --account <name> --limit 1    # exactly one pen
 node scripts/network-run.mjs --account <name>                  # full invite + pending sweep now
 ```
 
-### Invite outcomes (matches the n8n behavior)
+### Invite outcomes
 
 For each `not_connected` lead within the day's remaining budget, runs the workflow:
 
@@ -272,6 +272,12 @@ Result classification:
 - `data.then.error.type` signals an account-level limit on the action category (e.g.
   `limitExceeded`, a rate limit) → the lead stays `not_connected` (NOT a per-lead error) and
   this account's run backs off (stops for the cycle); the lead is retried on a later wake-up.
+- `data.then.error.type` is `requestNotAllowed` ("LinkedIn has restricted sending a connection
+  request") → ambiguous, disambiguated by pattern: a **streak** (2+ in a row with no successful
+  invite between) = the account's weekly invite limit → leave `not_connected` and back off (not
+  the lead's fault); an **isolated** hit = the person restricts invites → counted against the
+  lead, and after `RESTRICTED_LEAD_ATTEMPTS` (2) isolated hits the lead is closed as `exhausted`
+  so it never hangs. Never burns a whole queue on a weekly-limit burst.
 - anything else → `status='error'`, `error_type`/`error_message` stored
 
 `linkedin-cli` exit code 4 (account issue) or 6 (rate limit) aborts the whole

@@ -149,6 +149,7 @@ async function commandUpdate(skillNames, ctx) {
           enableOptional: false,
           home: ctx.home,
           version,
+          telemetryEvent: 'update',
         }),
       );
     }
@@ -165,6 +166,7 @@ async function commandRemove(skillNames, ctx) {
 
   const installed = gatherInstalled(ctx);
   const removed = [];
+  const version = packageVersion();
   for (const skill of skills) {
     const targets = installed
       .filter((i) => i.skill === skill.name)
@@ -176,9 +178,10 @@ async function commandRemove(skillNames, ctx) {
           skillsRoot: skillsRoot(agent, loc.scope, ctx),
           skillDir: loc.dir,
           commandsDir: commandsDir(agent, loc.scope, ctx),
+          mode: loc.mode ?? 'copy',
         };
       });
-    removed.push(removeSkill(skill, targets));
+    removed.push(await removeSkill(skill, targets, { home: ctx.home, version }));
   }
   writeResult(success({ removed }));
 }

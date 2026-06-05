@@ -2,8 +2,8 @@
 
 A LinkedIn lead pipeline skill for AI agents (Claude Code, Codex, Cursor, etc.).
 Drops a single SQLite DB and a set of Node scripts that wrap
-[`linkedin-cli`](https://www.npmjs.com/package/@linkedapi/linkedin-cli) and
-replace a two-workflow n8n setup with a local, queryable pipeline.
+[`linkedin-cli`](https://www.npmjs.com/package/@linkedapi/linkedin-cli) into a
+local, queryable lead pipeline.
 
 ## What it does
 
