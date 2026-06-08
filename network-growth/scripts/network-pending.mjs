@@ -5,7 +5,12 @@ import { ok, fail, info } from './lib/output.mjs';
 import { runLinkedin } from './lib/cli.mjs';
 import { getAccountOrFail, isFatalExitCode } from './lib/account.mjs';
 import { recordRunStart, recordRunFinish } from './lib/runs.mjs';
-import { resolveFailedAttempt } from './lib/retry.mjs';
+import { resolveFailedAttempt, countTrailingPersonNotFound } from './lib/retry.mjs';
+
+// How many consecutive personNotFound status checks before a lead is closed terminally.
+// We query the stable hashed member URL, so a streak means the member is genuinely gone
+// (deleted/deactivated) rather than a stale public slug — there is nothing left to retry.
+const PERSON_NOT_FOUND_ATTEMPTS = 2;
 
 const { flags } = parseArgs();
 
@@ -56,7 +61,11 @@ async function main() {
   };
 
   for (const lead of leads) {
-    const personUrl = lead.public_url || lead.hashed_url;
+    // Prefer the hashed member URL: it is stable across name / vanity-URL changes, whereas a
+    // stored public slug goes dead the moment the person renames (then `connection status`
+    // returns personNotFound forever). Fall back to public_url for `st` leads, where the
+    // hashed_url IS the public URL.
+    const personUrl = lead.hashed_url || lead.public_url;
 
     let runId;
     withDb((db) => {
@@ -87,15 +96,34 @@ async function main() {
 
     const statusBody = cli.json ?? {};
     if (statusBody.success === false) {
+      const errorType = statusBody.error?.type;
+      const errorMessage = statusBody.error?.message ?? `exit ${cli.exitCode}`;
       withDb((db) =>
-        recordRunFinish(db, runId, {
-          success: false,
-          rawResponse: cli.json,
-          errorMessage: statusBody.error?.message ?? `exit ${cli.exitCode}`,
-        }),
+        recordRunFinish(db, runId, { success: false, rawResponse: cli.json, errorMessage }),
       );
       summary.processed++;
-      summary.errors++;
+
+      // personNotFound means the URL no longer resolves to a LinkedIn member. We query the
+      // stable hashed member URL above, so this is a permanent condition (deleted/deactivated
+      // account), not a stale public slug — retrying it every cycle just burns workflow runs
+      // and never resolves. After a short streak, close the lead terminally instead of
+      // leaving it pending forever. Other (transient) errors keep the previous behaviour.
+      const shouldExhaust =
+        errorType === 'personNotFound' &&
+        withDb((db) => countTrailingPersonNotFound(db, lead.hashed_url)) >= PERSON_NOT_FOUND_ATTEMPTS;
+      if (shouldExhaust) {
+        withDb((db) =>
+          db
+            .prepare(
+              `UPDATE leads SET status='exhausted', status_updated_at = datetime('now'),
+                 error_type='personNotFound', error_message=? WHERE hashed_url = ?`,
+            )
+            .run(errorMessage, lead.hashed_url),
+        );
+        summary.exhausted++;
+      } else {
+        summary.errors++;
+      }
       continue;
     }
     const status = statusBody.data?.connectionStatus ?? statusBody.data?.status;

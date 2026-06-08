@@ -13,6 +13,30 @@ export function attemptedAccounts(db, leadHashedUrl) {
     .filter(Boolean);
 }
 
+// The Core error message returned when a profile URL resolves to no LinkedIn member.
+const PERSON_NOT_FOUND_MESSAGE = 'not an existing LinkedIn person';
+
+// Count the most recent consecutive `check_status` runs for a lead that failed with
+// personNotFound. Used to terminate a lead only after a short streak, so a single
+// transient miss does not close an otherwise-reachable person.
+export function countTrailingPersonNotFound(db, leadHashedUrl) {
+  const rows = db
+    .prepare(
+      `SELECT success, error_message FROM runs
+       WHERE lead_hashed_url = ? AND action = 'check_status'
+       ORDER BY started_at DESC, id DESC
+       LIMIT 10`,
+    )
+    .all(leadHashedUrl);
+  let streak = 0;
+  for (const row of rows) {
+    const isPersonNotFound = !row.success && (row.error_message ?? '').includes(PERSON_NOT_FOUND_MESSAGE);
+    if (!isPersonNotFound) break;
+    streak++;
+  }
+  return streak;
+}
+
 // The configured cap on how many distinct accounts may attempt one lead.
 // 'all' resolves to the current count of active accounts.
 export function resolveMaxAttempts(db) {

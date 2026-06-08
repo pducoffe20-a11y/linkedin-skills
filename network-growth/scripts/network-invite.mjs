@@ -82,7 +82,10 @@ async function main() {
     errors: 0, aborted: false,
   };
   for (const lead of leads) {
-    const personUrl = lead.public_url || lead.hashed_url;
+    // Prefer the hashed member URL (stable across name / vanity-URL changes) so a reassigned
+    // lead whose stored public slug has gone stale still opens. Falls back to public_url for
+    // `st` leads, where the hashed_url IS the public URL.
+    const personUrl = lead.hashed_url || lead.public_url;
     const def = {
       actionType: 'st.openPersonPage',
       personUrl,
