@@ -1,9 +1,9 @@
 ---
-name: network-growth
+name: linkedin-growth
 description: Two-phase LinkedIn lead pipeline driven by linkedin-cli. Phase A imports leads from a search URL or filters, qualifies them against a configurable ICP via sub-agent, and stores them in a local SQLite database with round-robin assignment across one or more LinkedIn accounts. Phase B runs on a schedule per account — sends connection invites up to a daily limit and withdraws stale pending requests. Use when the user wants to grow their network from LinkedIn searches, manage outgoing invites at scale, ask status questions (counts, conversion, pending older than N days, last imports), pause/resume an account, change ICP, or install the recurring scheduler.
 ---
 
-# Network Growth Skill
+# LinkedIn Growth Skill
 
 This skill turns a Sales Navigator (or regular) search into a managed pipeline:
 **search → qualify (you, via sub-agent) → store → invite on schedule → check pending → withdraw stale**.

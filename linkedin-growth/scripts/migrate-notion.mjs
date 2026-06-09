@@ -22,7 +22,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const HOME = process.env.HOME;
-const DATA_DIR = join(HOME, '.local/share/linkedapi-network-growth');
+const DATA_DIR = join(HOME, '.local/share/linkedapi-linkedin-growth');
 const TOKEN = readFileSync(join(DATA_DIR, '.notion-token'), 'utf8').trim();
 const DB_PATH = join(DATA_DIR, 'db.sqlite');
 const CACHE = join(DATA_DIR, 'tmp/notion-leads-cache.json');

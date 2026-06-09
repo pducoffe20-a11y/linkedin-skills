@@ -3,7 +3,7 @@ description: Import leads from a LinkedIn / Sales Navigator search into the pipe
 argument-hint: "[search URL or filters] [list name]"
 ---
 
-Use the **network-growth** skill to run a Phase A import. Arguments: $ARGUMENTS
+Use the **linkedin-growth** skill to run a Phase A import. Arguments: $ARGUMENTS
 
 Drive the full import flow:
 

@@ -1,4 +1,4 @@
-// Minimal argv parser, mirroring network-growth/scripts/lib/args.mjs but with support for
+// Minimal argv parser, mirroring linkedin-growth/scripts/lib/args.mjs but with support for
 // repeated flags (e.g. `--agent claude-code --agent codex`) collapsed into arrays.
 
 export function parseArgs(argv = process.argv.slice(2)) {

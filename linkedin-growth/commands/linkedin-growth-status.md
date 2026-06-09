@@ -1,9 +1,9 @@
 ---
-description: Show the network-growth dashboard — lead counts by status, invites left today, pending older than the threshold, recent errors, and recent imports.
+description: Show the linkedin-growth dashboard — lead counts by status, invites left today, pending older than the threshold, recent errors, and recent imports.
 argument-hint: "[account name] [question]"
 ---
 
-Use the **network-growth** skill to answer status questions. Arguments: $ARGUMENTS
+Use the **linkedin-growth** skill to answer status questions. Arguments: $ARGUMENTS
 
 1. Start with the dashboard: `node scripts/status.mjs --json` (add `--account <name>` if I
    named one, and `--since 7d`/`30d` if I asked about a time window).

@@ -249,7 +249,7 @@ Usage:
   npx @linkedapi/skills remove <skill...>        Remove skills
   npx @linkedapi/skills doctor [--json]          Check environment & prerequisites
 
-Skills:  linkedin, network-growth
+Skills:  linkedin, linkedin-growth
 Agents:  ${AGENTS.map((a) => a.id).join(', ')}
 
 Options:
@@ -257,7 +257,7 @@ Options:
   --scope <s>           project | global. With --yes, defaults to project in a git repo, else global.
   --link                Symlink one canonical copy into each agent (default: copy).
   --linked-api-token=…  Configure tokens non-interactively (with --identification-token=…).
-  --enable-scheduler    Enable the network-growth background scheduler.
+  --enable-scheduler    Enable the linkedin-growth background scheduler.
   --yes                 Non-interactive: take defaults/flags, never prompt.
   --json                Machine-readable {success,data} / {success,error} output.
   --dry-run             Print planned file operations; write nothing.

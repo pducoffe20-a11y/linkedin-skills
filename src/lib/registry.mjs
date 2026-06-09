@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // src/lib/registry.mjs → package root is two directories up. Bundled skill content
-// (linkedin/, network-growth/) and registry.json live at the package root.
+// (linkedin/, linkedin-growth/) and registry.json live at the package root.
 export const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 let cached;

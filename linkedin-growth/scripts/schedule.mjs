@@ -8,7 +8,7 @@ import { ok, fail, info } from './lib/output.mjs';
 import { SKILL_ROOT, logsDir, ensureDir, dataDir } from './lib/paths.mjs';
 import { defaults } from './lib/config.mjs';
 
-const SERVICE_ID = 'io.linkedapi.network-growth.tick';
+const SERVICE_ID = 'io.linkedapi.linkedin-growth.tick';
 
 const { positional, flags } = parseArgs();
 const cmd = positional[0];
@@ -215,7 +215,7 @@ function installSystemd(intervalMinutes) {
   const { base, servicePath, timerPath } = systemdPaths();
   mkdirSync(base, { recursive: true });
   const service = `[Unit]
-Description=Linked API network-growth tick
+Description=Linked API linkedin-growth tick
 
 [Service]
 Type=oneshot
@@ -225,7 +225,7 @@ StandardOutput=append:${join(logsDir(), 'tick.stdout.log')}
 StandardError=append:${join(logsDir(), 'tick.stderr.log')}
 `;
   const timer = `[Unit]
-Description=Linked API network-growth tick timer
+Description=Linked API linkedin-growth tick timer
 
 [Timer]
 OnBootSec=1min

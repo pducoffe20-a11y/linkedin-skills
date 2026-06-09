@@ -1,5 +1,5 @@
 // Output envelope shared by all headless commands, mirroring the {success,data} /
-// {success,error} shape used by network-growth/scripts/lib/output.mjs. In --json mode only the
+// {success,error} shape used by linkedin-growth/scripts/lib/output.mjs. In --json mode only the
 // final JSON line is written to stdout (no ANSI / spinners); human-readable logs go to stderr.
 
 export function isJsonMode(argv = process.argv) {

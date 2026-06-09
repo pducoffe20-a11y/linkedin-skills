@@ -1,4 +1,4 @@
-# network-growth
+# linkedin-growth
 
 A LinkedIn lead pipeline skill for AI agents (Claude Code, Codex, Cursor, etc.).
 Drops a single SQLite DB and a set of Node scripts that wrap
@@ -29,13 +29,13 @@ All state lives in a local SQLite database. No external services beyond
    linkedin setup --linked-api-token=<token> --identification-token=<token>
    ```
    Repeat the second command per LinkedIn account you want to connect.
-3. Place this `network-growth/` folder into your AI agent's skills directory:
-   - Claude Code (project): `<project>/.claude/skills/network-growth/`
-   - Claude Code (user): `~/.claude/skills/network-growth/`
+3. Place this `linkedin-growth/` folder into your AI agent's skills directory:
+   - Claude Code (project): `<project>/.claude/skills/linkedin-growth/`
+   - Claude Code (user): `~/.claude/skills/linkedin-growth/`
    - Codex / other: per your tool's skill discovery convention
 4. Install local dependencies:
    ```bash
-   cd <path-to-network-growth>
+   cd <path-to-linkedin-growth>
    npm install --omit=dev
    ```
 5. Verify:
@@ -66,9 +66,9 @@ symlinking into your commands directory:
 
 ```bash
 # project-level
-ln -s <path>/network-growth/commands/linkedin-growth-*.md <project>/.claude/commands/
+ln -s <path>/linkedin-growth/commands/linkedin-growth-*.md <project>/.claude/commands/
 # or user-level
-ln -s <path>/network-growth/commands/linkedin-growth-*.md ~/.claude/commands/
+ln -s <path>/linkedin-growth/commands/linkedin-growth-*.md ~/.claude/commands/
 ```
 
 | Command | What it does |
@@ -84,8 +84,8 @@ These are conveniences — you can equally just talk to the agent in plain langu
 
 | Platform | DB / data dir |
 |----------|------------------------|
-| macOS / Linux | `~/.local/share/linkedapi-network-growth/` |
-| Windows | `%APPDATA%\linkedapi-network-growth\` |
+| macOS / Linux | `~/.local/share/linkedapi-linkedin-growth/` |
+| Windows | `%APPDATA%\linkedapi-linkedin-growth\` |
 
 ## Manual operations cheat sheet
 

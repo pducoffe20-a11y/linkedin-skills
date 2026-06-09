@@ -21,7 +21,7 @@ Read https://linkedapi.io/skills/install.md and follow it.
 
 For a single skill, hand over its own runbook instead — e.g.
 `https://linkedapi.io/skills/linkedin/install.md` or
-`https://linkedapi.io/skills/network-growth/install.md`.
+`https://linkedapi.io/skills/linkedin-growth/install.md`.
 
 ### Non-interactive (agents / CI)
 
@@ -33,7 +33,7 @@ npx @linkedapi/skills detect --json
 npx @linkedapi/skills add linkedin --yes
 
 # Install specific skills into specific agents
-npx @linkedapi/skills add linkedin network-growth \
+npx @linkedapi/skills add linkedin linkedin-growth \
   --agent claude-code --agent codex --scope project --yes --json
 ```
 
@@ -57,8 +57,8 @@ Other commands: `list`, `update`, `remove`, `doctor` (all support `--json`). See
 { "success": true,
   "data": {
     "ready": false,
-    "pending": [{ "skill": "network-growth", "pending": [{ "name": "db-accounts", "message": "0 accounts in DB — register each linkedin-cli account…" }] }],
-    "installed": [{ "skill": "network-growth", "ok": true, "ready": false }]
+    "pending": [{ "skill": "linkedin-growth", "pending": [{ "name": "db-accounts", "message": "0 accounts in DB — register each linkedin-cli account…" }] }],
+    "installed": [{ "skill": "linkedin-growth", "ok": true, "ready": false }]
   } }
 ```
 
@@ -67,7 +67,7 @@ Other commands: `list`, `update`, `remove`, `doctor` (all support `--json`). See
 | Skill | Description |
 |-------|-------------|
 | [linkedin](linkedin/) | General-purpose LinkedIn automation – fetch profiles, search people and companies, send messages, manage connections, create posts, and more |
-| [network-growth](network-growth/) | Two-phase lead pipeline – import + qualify leads against your ICP, then send connection invites on a schedule across one or more accounts |
+| [linkedin-growth](linkedin-growth/) | Two-phase lead pipeline – import + qualify leads against your ICP, then send connection invites on a schedule across one or more accounts |
 
 ## Prerequisites
 
@@ -81,7 +81,7 @@ The installer checks these for you and offers to set them up:
 ## Manual install (fallback)
 
 Copy the skill folder into your agent's skills directory, e.g. `.claude/skills/<skill>/`
-(project) or `~/.claude/skills/<skill>/` (global). For `network-growth`, also run
+(project) or `~/.claude/skills/<skill>/` (global). For `linkedin-growth`, also run
 `npm install --omit=dev` and `node scripts/doctor.mjs` inside the copied folder.
 
 ## License

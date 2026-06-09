@@ -1,8 +1,8 @@
 ---
-description: Onboard the network-growth pipeline — check prerequisites, connect LinkedIn accounts, register them, and install the scheduler.
+description: Onboard the linkedin-growth pipeline — check prerequisites, connect LinkedIn accounts, register them, and install the scheduler.
 ---
 
-Use the **network-growth** skill. Walk me through first-run setup, doing as much as
+Use the **linkedin-growth** skill. Walk me through first-run setup, doing as much as
 possible yourself and only asking me for things you genuinely cannot obtain
 (LinkedIn tokens, account names, preferred invite limits/times).
 

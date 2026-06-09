@@ -3,7 +3,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync } from 'node:fs';
 
-const APP_NAME = 'linkedapi-network-growth';
+const APP_NAME = 'linkedapi-linkedin-growth';
 
 export const SKILL_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 

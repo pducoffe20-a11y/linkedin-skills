@@ -1,9 +1,9 @@
 ---
-description: Adjust network-growth account settings — daily invite limit, schedule time, pending threshold, pause/resume — or edit the ICP qualification prompt.
+description: Adjust linkedin-growth account settings — daily invite limit, schedule time, pending threshold, pause/resume — or edit the ICP qualification prompt.
 argument-hint: "[account name] [what to change]"
 ---
 
-Use the **network-growth** skill to change configuration. Arguments: $ARGUMENTS
+Use the **linkedin-growth** skill to change configuration. Arguments: $ARGUMENTS
 
 First show current state with `node scripts/account.mjs list --json`. Then apply what I
 asked, confirming the exact change back to me:

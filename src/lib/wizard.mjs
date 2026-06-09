@@ -71,9 +71,9 @@ async function wizard(ctx) {
   await ensurePrereqs(snap);
 
   let enableScheduler = false;
-  if (skillIds.includes('network-growth')) {
+  if (skillIds.includes('linkedin-growth')) {
     enableScheduler = await prompts.confirm({
-      message: 'Enable the network-growth background scheduler now (sends invites on a schedule)?',
+      message: 'Enable the linkedin-growth background scheduler now (sends invites on a schedule)?',
       initialValue: false,
     });
   }
@@ -95,7 +95,7 @@ async function wizard(ctx) {
     const result = await installSkill(skill, targets, {
       mode: 'copy',
       dryRun: false,
-      enableOptional: name === 'network-growth' && enableScheduler,
+      enableOptional: name === 'linkedin-growth' && enableScheduler,
       home: ctx.home,
       version,
     });

@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 
-const LINKEDAPI_CLIENT = 'skill:network-growth';
+const LINKEDAPI_CLIENT = 'skill:linkedin-growth';
 
 export function runLinkedin(args, { cliAccount, input, timeoutMs } = {}) {
   // oclif requires the command/topic tokens first, then flags:

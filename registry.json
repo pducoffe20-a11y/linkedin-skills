@@ -10,8 +10,8 @@
       "postInstall": [],
       "slashCommands": null
     },
-    "network-growth": {
-      "source": "network-growth",
+    "linkedin-growth": {
+      "source": "linkedin-growth",
       "label": "Lead pipeline (import → qualify → invites)",
       "description": "Two-phase LinkedIn lead pipeline: import + qualify leads against an ICP, then send connection invites on a schedule across one or more accounts.",
       "agents": ["claude-code", "codex", "cursor", "windsurf"],
