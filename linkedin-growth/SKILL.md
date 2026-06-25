@@ -272,6 +272,9 @@ Result classification:
 - `data.then.error.type` signals an account-level limit on the action category (e.g.
   `limitExceeded`, a rate limit) → the lead stays `not_connected` (NOT a per-lead error) and
   this account's run backs off (stops for the cycle); the lead is retried on a later wake-up.
+- `data.then.error.type` is `noteLimitExceeded` → the account has reached LinkedIn's
+  personalized invitation-note limit. Treat it as account-level gating, not a per-lead error:
+  leave the lead `not_connected`, back off, and retry later or send future invites without notes.
 - `data.then.error.type` is `requestNotAllowed` ("LinkedIn has restricted sending a connection
   request") → ambiguous, disambiguated by pattern: a **streak** (2+ in a row with no successful
   invite between) = the account's weekly invite limit → leave `not_connected` and back off (not

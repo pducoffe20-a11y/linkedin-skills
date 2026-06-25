@@ -262,6 +262,14 @@ function classifyInviteResult(cli) {
   if (thenErrType.includes('alreadypending')) return { status: 'pending' };
   if (thenErrType.includes('alreadyconnected')) return { status: 'connected' };
   if (then && then.success === false) {
+    if (thenErrType.includes('noteslimitexceeded')) {
+      return {
+        status: 'limited',
+        errorType: then.error?.type || 'noteLimitExceeded',
+        errorMessage: then.error?.message ?? 'account personalized invite note limit reached',
+      };
+    }
+
     // Account-level rate / action-category limit (platform-side) → back off, don't burn
     // the lead. It stays not_connected and is retried on a later wake-up.
     if (isLimitError(thenErrType)) {
