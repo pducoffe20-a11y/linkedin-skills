@@ -1,0 +1,18 @@
+{
+  "skills": {
+    "linkedin": {
+      "version": "1.0.8",
+      "scope": "project",
+      "agent": "claude-code",
+      "mode": "copy",
+      "installedAt": "2026-07-05T05:45:38.906Z"
+    },
+    "linkedin-growth": {
+      "version": "1.0.8",
+      "scope": "project",
+      "agent": "claude-code",
+      "mode": "copy",
+      "installedAt": "2026-07-05T05:47:37.488Z"
+    }
+  }
+}
